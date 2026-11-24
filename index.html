@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LibraryDesk – Inventory Management</title>
+<style>
+:root{--bg:#f6f5f1;--sf:#fff;--tx:#1d2428;--mu:#667178;--bd:#dcdad2;--ac:#1f5f5b;--ac2:#e8f1f0;--rd:#b3261e;--rd2:#fbeae8;--am:#8a5a00;--am2:#fff4dc;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14181a;--sf:#1d2326;--tx:#e8ecee;--mu:#93a0a6;--bd:#2f393d;--ac:#6cc2bb;--ac2:#1c3533;--rd:#ff8a80;--rd2:#3a1f1d;--am:#ffcc66;--am2:#3a2f14;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#14181a;--sf:#1d2326;--tx:#e8ecee;--mu:#93a0a6;--bd:#2f393d;--ac:#6cc2bb;--ac2:#1c3533;--rd:#ff8a80;--rd2:#3a1f1d;--am:#ffcc66;--am2:#3a2f14;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:14px 20px;background:var(--sf);border-bottom:1px solid var(--bd)}
+h1{font-size:18px;margin:0}h2{font-size:16px;margin:0 0 10px}
+nav{display:flex;gap:4px;flex-wrap:wrap;padding:10px 20px 0}
+nav button{border:1px solid var(--bd);background:var(--sf);color:var(--tx);padding:8px 14px;border-radius:8px;cursor:pointer;font:inherit}
+nav button.on{background:var(--ac);color:var(--bg);border-color:var(--ac)}
+main{padding:16px 20px;max-width:1100px;margin:auto}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.card{background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:16px}
+.stat b{display:block;font-size:26px}.stat span{color:var(--mu);font-size:13px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:10px}
+label{display:flex;flex-direction:column;font-size:12px;color:var(--mu);gap:3px}
+input,select{padding:8px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font:inherit;min-width:140px}
+button.b{padding:8px 14px;border:0;border-radius:6px;background:var(--ac);color:var(--bg);cursor:pointer;font:inherit}
+button.s{padding:5px 10px;border:1px solid var(--bd);border-radius:6px;background:transparent;color:var(--tx);cursor:pointer;font:inherit;font-size:13px}
+button.d{color:var(--rd);border-color:var(--rd)}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:8px;border-bottom:1px solid var(--bd);white-space:nowrap}th{color:var(--mu);font-weight:600;font-size:12px}
+.tag{padding:2px 8px;border-radius:99px;font-size:12px;background:var(--ac2);color:var(--ac)}
+.tag.r{background:var(--rd2);color:var(--rd)}.tag.a{background:var(--am2);color:var(--am)}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:8px;display:none;max-width:90%;z-index:9}
+.mu{color:var(--mu)}
+</style></head><body>
+<header><h1>📚 LibraryDesk</h1><div class="row" style="margin:0;align-items:center"><span id="dt" class="mu"></span><button class="s" onclick="skip(7)">Simulate +7 days</button><button class="s" onclick="skip(-7)">−7</button></div></header>
+<nav id="nav"></nav><main id="main"></main><div id="toast"></div>
+<script>
+const FINE=2,LOAN=14,MAXL=3,BLOCK=100;
+let off=0,tab='Dashboard',q='';
+let books=[{id:1,t:'Clean Code',a:'Robert C. Martin',i:'9780132350884',n:3},{id:2,t:'The Pragmatic Programmer',a:'Hunt & Thomas',i:'9780135957059',n:2},{id:3,t:'Introduction to Algorithms',a:'Cormen et al.',i:'9780262046305',n:4},{id:4,t:'Digital Design',a:'M. Morris Mano',i:'9780132774208',n:1},{id:5,t:'Let Us C',a:'Yashavant Kanetkar',i:'9788131904954',n:2}];
+let members=[{id:1,n:'Aarav Sharma'},{id:2,n:'Meera Iyer'},{id:3,n:'Rohan Patil'}];
+let loans=[],fines=[],nid=100;
+const day=()=>Math.floor(Date.now()/864e5)+off;
+const fd=d=>new Date(d*864e5).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+const out=b=>loans.filter(l=>l.b===b&&!l.r).length;
+const av=b=>b.n-out(b.id);
+const bk=id=>books.find(b=>b.id==id),mb=id=>members.find(m=>m.id==id);
+const owed=m=>fines.filter(f=>f.m==m&&!f.p).reduce((s,f)=>s+f.amt,0);
+const accrued=l=>Math.max(0,day()-l.due)*FINE;
+loans.push({id:1,b:1,m:1,iss:day()-20,due:day()-6,rn:0,r:null},{id:2,b:3,m:2,iss:day()-3,due:day()+11,rn:0,r:null});
+fines.push({id:1,m:3,amt:40,why:'Late return (20 days × ₹2)',p:false});
+let wl=[],log=[];
+loans.push({id:3,b:4,m:1,iss:day()-40,due:day()-26,rn:0,r:day()-27},{id:4,b:4,m:2,iss:day()-25,due:day()-11,rn:0,r:day()-12},{id:5,b:4,m:3,iss:day()-9,due:day()+5,rn:0,r:null},{id:6,b:2,m:3,iss:day()-30,due:day()-16,rn:0,r:day()-18});
+wl.push({id:7,b:4,m:1},{id:8,b:4,m:2});
+log.push({d:day()-1,s:'Sample data loaded'});
+function toast(s){log.unshift({d:day(),s});const t=document.getElementById('toast');t.textContent=s;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',2600)}
+function skip(n){off+=n;go(tab)}
+function go(t){tab=t;render()}
+const v=id=>document.getElementById(id).value;
+function addBook(){const t=v('bt').trim(),a=v('ba').trim(),i=v('bi').trim(),n=parseInt(v('bn'));
+ if(!t||!i||!(n>0))return toast('Title, ISBN and copies (≥1) are required.');
+ const e=books.find(b=>b.i===i);
+ if(e){e.n+=n;toast(`ISBN exists – added ${n} copies to “${e.t}” (now ${e.n}).`)}else{books.push({id:nid++,t,a,i,n});toast('Book added.')}render()}
+function delCopies(id){const b=bk(id),k=parseInt(prompt('How many copies to remove?','1'));if(!k||k<1)return;
+ if(b.n-k<out(id))return toast(`Only ${av(b)} copies are on the shelf; ${out(id)} are issued.`);
+ b.n-=k;if(b.n===0)books=books.filter(x=>x.id!==id);render()}
+function delBook(id){const b=bk(id);if(out(id))return toast(`Cannot delete: ${out(id)} copies are currently issued.`);
+ if(confirm(`Delete “${b.t}” and all ${b.n} copies?`)){books=books.filter(x=>x.id!==id);render()}}
+function issue(){const b=bk(v('ib')),m=mb(v('im'));if(!b||!m)return;
+ if(owed(m.id)>BLOCK)return toast(`Blocked: ${m.n} owes ₹${owed(m.id)} (limit ₹${BLOCK}).`);
+ if(loans.some(l=>!l.r&&l.m==m.id&&day()>l.due))return toast(`Blocked: ${m.n} has an overdue book.`);
+ if(loans.filter(l=>!l.r&&l.m==m.id).length>=MAXL)return toast(`Limit reached: ${MAXL} books per member.`);
+ if(loans.some(l=>!l.r&&l.m==m.id&&l.b==b.id))return toast('Member already holds a copy of this title.');
+ const q2=wl.filter(w=>w.b==b.id),pos=q2.findIndex(w=>w.m==m.id);
+ if(av(b)<1||(pos<0&&av(b)<=q2.length)){if(pos>=0)return toast('Already on the waitlist (position '+(pos+1)+').');wl.push({id:nid++,b:b.id,m:m.id});return toast('No free copy – '+m.n+' added to the waitlist (position '+(q2.length+1)+').')}
+ if(pos>=av(b))return toast('Copies are held for members ahead in the waitlist.');
+ if(pos>=0)wl=wl.filter(w=>!(w.b==b.id&&w.m==m.id));
+ loans.push({id:nid++,b:b.id,m:m.id,iss:day(),due:day()+LOAN,rn:0,r:null});toast(`Issued. Due ${fd(day()+LOAN)}.`);render()}
+function ret(id){const l=loans.find(x=>x.id==id);l.r=day();const f=accrued(l);
+ if(f){fines.push({id:nid++,m:l.m,amt:f,why:`Late return (${f/FINE} days × ₹${FINE})`,p:false});toast(`Returned late – fine ₹${f} recorded.`)}else toast('Returned on time.');const nx=wl.find(w=>w.b==l.b);if(nx&&!f)toast('Returned. Copy held for next in waitlist: '+mb(nx.m).n);render()}
+function wcancel(id){wl=wl.filter(w=>w.id!=id);toast('Removed from waitlist.');render()}
+function insights(){const rows=books.map(b=>{const h=loans.filter(l=>l.b==b.id).length,w=wl.filter(x=>x.b==b.id).length;return{b,h,w,s:h/b.n+w*2}}).filter(r=>r.w||r.s>=1.5).sort((a,c)=>c.s-a.s);
+ const bins=[0,0,0,0,0,0,0];loans.filter(l=>!l.r).forEach(l=>{const k=l.due-day();if(k>=0&&k<7)bins[k]++});const mx=Math.max(1,...bins);
+ const svg=`<svg viewBox="0 0 290 100" style="width:100%;max-width:420px">${bins.map((n,i)=>`<rect x="${i*40+10}" y="${75-n/mx*60}" width="28" height="${n/mx*60}" rx="4" style="fill:var(--ac)"/><text x="${i*40+24}" y="${70-n/mx*60}" text-anchor="middle" font-size="11" style="fill:var(--tx)">${n}</text><text x="${i*40+24}" y="92" text-anchor="middle" font-size="10" style="fill:var(--mu)">${i?'+'+i+'d':'today'}</text>`).join('')}</svg>`;
+ return `<div class="card"><h2>Demand insights: what to buy next</h2><p class="mu" style="margin:0 0 8px">Score = loans per copy + 2 × people waiting. Titles at 1.5 or above, or with a queue, are flagged.</p>${T(['Title','Copies','Times borrowed','Waiting','Score','Suggestion'],rows.map(r=>`<tr><td>${r.b.t}</td><td>${r.b.n}</td><td>${r.h}</td><td>${r.w}</td><td>${r.s.toFixed(1)}</td><td><span class="tag a">Buy +${Math.max(1,r.w)} copies</span></td></tr>`).join(''))}</div><div class="card"><h2>Books due in the next 7 days</h2>${svg}</div><div class="card"><h2>Recent activity</h2>${T(['Date','Event'],log.slice(0,6).map(e=>`<tr><td>${fd(e.d)}</td><td>${e.s}</td></tr>`).join(''))}</div>`}
+function renew(id){const l=loans.find(x=>x.id==id);if(l.rn)return toast('Already renewed once.');if(day()>l.due)return toast('Overdue loans cannot be renewed.');l.due+=LOAN;l.rn=1;toast('Renewed for 14 days.');render()}
+function lost(id){const l=loans.find(x=>x.id==id),b=bk(l.b);l.r=day();b.n-=1;fines.push({id:nid++,m:l.m,amt:300,why:`Lost book: ${b.t} (replacement ₹300)`,p:false});toast('Marked lost; copy removed from stock; ₹300 fine.');render()}
+function pay(id){fines.find(f=>f.id==id).p=true;toast('Fine paid.');render()}
+function waive(id){fines=fines.filter(f=>f.id!=id);toast('Fine waived.');render()}
+function addMember(){const n=v('mn').trim();if(!n)return toast('Enter a name.');members.push({id:nid++,n});render()}
+const T=(h,r)=>`<div class="tw"><table><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr>${r||`<tr><td colspan="${h.length}" class="mu">Nothing to show.</td></tr>`}</table></div>`;
+const views={
+Dashboard(){const tot=books.reduce((s,b)=>s+b.n,0),iss=loans.filter(l=>!l.r),od=iss.filter(l=>day()>l.due),fo=fines.filter(f=>!f.p).reduce((s,f)=>s+f.amt,0),low=books.filter(b=>av(b)===0);
+ return `<div class="grid">${[['Titles',books.length],['Total copies',tot],['Available',tot-iss.length],['Issued',iss.length],['Overdue',od.length],['Fines due','₹'+fo]].map(s=>`<div class="card stat"><b>${s[1]}</b><span>${s[0]}</span></div>`).join('')}</div>
+ <div class="card"><h2>Overdue loans</h2>${T(['Book','Member','Due','Days late','Accrued fine'],od.map(l=>`<tr><td>${bk(l.b).t}</td><td>${mb(l.m).n}</td><td>${fd(l.due)}</td><td>${day()-l.due}</td><td><span class="tag r">₹${accrued(l)}</span></td></tr>`).join(''))}</div>
+ <div class="card"><h2>Out of stock (all copies issued)</h2>${low.length?low.map(b=>`<span class="tag a">${b.t}</span> `).join(''):'<span class="mu">None.</span>'}</div>${insights()}`},
+Catalog(){const r=books.filter(b=>(b.t+b.a+b.i).toLowerCase().includes(q.toLowerCase()));
+ return `<div class="card"><h2>Add book / add copies</h2><div class="row"><label>Title<input id="bt"></label><label>Author<input id="ba"></label><label>ISBN<input id="bi"></label><label>Copies<input id="bn" type="number" min="1" value="1" style="min-width:80px"></label><button class="b" onclick="addBook()">Add</button></div><span class="mu">Entering an existing ISBN adds copies to that title instead of creating a duplicate.</span></div>
+ <div class="card"><div class="row"><h2 style="margin:0">Inventory</h2><input placeholder="Search title, author, ISBN" value="${q}" oninput="q=this.value;render(1)" id="sq"></div>${T(['Title','Author','ISBN','Total','On shelf','Issued','Status',''],r.map(b=>`<tr><td>${b.t}</td><td>${b.a}</td><td>${b.i}</td><td>${b.n}</td><td>${av(b)}</td><td>${out(b.id)}</td><td><span class="tag ${av(b)?'':'a'}">${av(b)?'Available':'All issued'}</span></td><td><button class="s" onclick="delCopies(${b.id})">Remove copies</button> <button class="s d" onclick="delBook(${b.id})">Delete title</button></td></tr>`).join(''))}</div>`},
+Circulation(){const act=loans.filter(l=>!l.r);
+ return `<div class="card"><h2>Issue a book</h2><div class="row"><label>Member<select id="im">${members.map(m=>`<option value="${m.id}">${m.n}${owed(m.id)?` (owes ₹${owed(m.id)})`:''}</option>`).join('')}</select></label><label>Book<select id="ib">${books.map(b=>`<option value="${b.id}">${b.t} – ${av(b)} available</option>`).join('')}</select></label><button class="b" onclick="issue()">Issue (${LOAN} days)</button></div><span class="mu">Rules: max ${MAXL} books, no overdue items, fines ≤ ₹${BLOCK}, one copy per title.</span></div>
+ <div class="card"><h2>Active loans</h2>${T(['Book','Member','Issued','Due','Status',''],act.map(l=>`<tr><td>${bk(l.b).t}</td><td>${mb(l.m).n}</td><td>${fd(l.iss)}</td><td>${fd(l.due)}</td><td>${day()>l.due?`<span class="tag r">Overdue ₹${accrued(l)}</span>`:'<span class="tag">On loan</span>'}</td><td><button class="s" onclick="ret(${l.id})">Return</button> <button class="s" onclick="renew(${l.id})">Renew</button> <button class="s d" onclick="lost(${l.id})">Lost</button></td></tr>`).join(''))}</div>
+ <div class="card"><h2>Waitlist (first come, first served)</h2>${T(['Book','Member','Position',''],wl.map(w=>`<tr><td>${bk(w.b).t}</td><td>${mb(w.m).n}</td><td>#${wl.filter(x=>x.b==w.b).indexOf(w)+1}</td><td><button class="s d" onclick="wcancel(${w.id})">Cancel</button></td></tr>`).join(''))}</div>
+ <div class="card"><h2>History</h2>${T(['Book','Member','Issued','Returned'],loans.filter(l=>l.r).map(l=>`<tr><td>${bk(l.b)?.t||'—'}</td><td>${mb(l.m).n}</td><td>${fd(l.iss)}</td><td>${fd(l.r)}</td></tr>`).join(''))}</div>`},
+Fines(){return `<div class="card"><h2>Fines (₹${FINE}/day, lost book ₹300)</h2>${T(['Member','Reason','Amount','Status',''],fines.map(f=>`<tr><td>${mb(f.m).n}</td><td>${f.why}</td><td>₹${f.amt}</td><td><span class="tag ${f.p?'':'r'}">${f.p?'Paid':'Unpaid'}</span></td><td>${f.p?'':`<button class="s" onclick="pay(${f.id})">Mark paid</button> <button class="s" onclick="waive(${f.id})">Waive</button>`}</td></tr>`).join(''))}</div>`},
+Members(){return `<div class="card"><h2>Add member</h2><div class="row"><label>Name<input id="mn"></label><button class="b" onclick="addMember()">Add</button></div></div><div class="card"><h2>Members</h2>${T(['Name','Books held','Fines due'],members.map(m=>`<tr><td>${m.n}</td><td>${loans.filter(l=>!l.r&&l.m==m.id).length}/${MAXL}</td><td>${owed(m.id)?`<span class="tag r">₹${owed(m.id)}</span>`:'—'}</td></tr>`).join(''))}</div>`}};
+function render(keep){document.getElementById('dt').textContent='Today: '+fd(day());
+ document.getElementById('nav').innerHTML=Object.keys(views).map(t=>`<button class="${t===tab?'on':''}" onclick="go('${t}')">${t}</button>`).join('');
+ document.getElementById('main').innerHTML=views[tab]();
+ if(keep){const s=document.getElementById('sq');s.focus();s.setSelectionRange(q.length,q.length)}}
+render();
+</script></body></html>
